@@ -1,0 +1,244 @@
+The following Job Aid explains the process of updating billing specific charge code CDFs (Comma Delimited Files). You will receive a request through Service Desk to add GL Codes/Descriptions to charge code CDFs.
+
+The first steps:
+All billing related cdf updates need to be approved by both the account manager and Global Accounting support (GAS). Before you beginning making any updates to the cdf file, check the following:
+
+•	Is the requester the Account Manager? You can determine if the requestor is the account manager by checking the branch procedures or Lync or Account Management Suites in insite.
+o	The branch procedures can be found on our Customers SOP Page on SharePoint
+•	All charge codes cdf’s and almost all other cdf that’s related to billing (few exceptions) must be approved by both the account manager and Global Accounting Support (GAS)
+
+Once GAS has approved and returned the incident, check the Log Comment, and confirm that all required information was provided. The Log Comment will look similar to the below:
+
+•	The example below instructs that the entries requested be added to the CDF.
+
+ 
+
+What is a CDF?
+
+CDF stands for Comma Delimited File and are used to substitute one value for another when an EDI translation runs. Essentially, CDFs are reference tables, used when the translation needs to change a value to match system requirements.
+
+Required Tortoise SVN: 
+Before you can update a CDF, make sure you have Tortoise SVN setup on your computer. Instructions can be found here: Subversion (SVN) Installation Instructions for Support
+You can check if you have correct permissions by using your login and password at the following link: http://build.chq.ei:8391/svnedi/edirepo/
+CDFs are stored in SVN in one of two locations:
+•	For EDIWebMethods CDFs, they are located in C:\ediweb\resources\prod\client, under the individual customer’s folder.
+•	For EDIGen CDFs, they are located in C:\svnedi\EDIGen\prod\cdfs
+
+
+
+This example will use EDIGen CDFs.
+
+ 
+
+Icon Overlays:
+
+Sometimes you will notice that your icon overlays do not match what they look like in other documents (green checkmarks, red X’s, etc.) This is a Windows system limitation and is normal; however, there is no workaround for this at this time.
+ 
+Required CDF Update Script and PowerShell:
+
+Before running the mass update script, you will need to associate PowerShell scripts to run correctly in windows. By default, PowerShell scripts will not run and will open up the code to be viewed in Notepad. 
+To Access the script for the first time go to this location on the ‘F’ drive:
+F:\EDI SUPPORT SHARED\Software\CDF Update Script
+
+1. Right click on “EDI_BILLING_GL_CODE_UPDATER.ps1”
+2. From the context select “Open with”
+3. From the next menu, select “Choose another app”  
+ 
+4, In the popup window, navigate to C:\Windows\System32\WindowsPowerShell\v1.0
+5. Select “powershell”
+6. Click the Open button.
+
+
+ 
+
+Copy the ‘cdf update script’:
+
+From the CDF Update Script folder, Select the ‘cdf update script’ (windows batch file) and drag/drop a copy onto your desktop. This script is used to launch the powershell script from the NAS. DO NOT copy the powershell script. Updated versions of the script will be loaded to the NAS folder and the batch file allows you to always execute the most up to date version. 
+
+ 
+Required Update CSV:
+
+This script requires the update information be in the correct format. Your input CSV should contain the following:
+Header[1] - CDF_TO_UPDATE : This column will contain the CDF name being updated.
+Header[2] – DESCRIPTIONS_TO_ADD : This column will contain the full line value being added to the file in header 1.
+
+All lines to add to a single CSV should be grouped together, ie:
+CDF_TO_UPDATE	DESCRIPTIONS_TO_ADD
+ctsi_KLACCHQ_charge_codes.cdf	4381_AIRFREIGHT CHARGES,400
+ctsi_KLACCHQ_charge_codes.cdf	4383_AIRFREIGHT CHARGES,400
+ctsi_KLACCHQ_charge_codes.cdf	4386_AIRFREIGHT CHARGES,400
+ctsi_MERCEWR_charge_codes.cdf	4381_DRAYAGE/CARTAGE,DRC
+ctsi_MERCEWR_charge_codes.cdf	4381_DRAYAGE/TRUCKING,DRC
+ctsi_MERCEWR_charge_codes.cdf	4381_INLAND FREIGHT,450
+ctsi_TECHLAX_charge_codes.cdf	4381_EIO INLAND FREIGHT,SHT
+ctsi_TECHLAX_charge_codes.cdf	4383_EIO INLAND FREIGHT,SHT
+
+
+Header[3] – CDF_TO_UPDATE_MASTER_LIST – This column contains Each CDF name, only once and should be in the same order as Header[1](from the above example):
+CDF_TO_UPDATE_MASTER_LIST
+ctsi_KLACCHQ_charge_codes.cdf
+ctsi_MERCEWR_charge_codes.cdf
+ctsi_TECHLAX_charge_codes.cdf
+
+
+
+Running the Update Script:
+
+Double-click on the ‘cdf update script’ batch file on your desktop. You will get this screen:
+ 
+1.	This field is used to input the ticket number and will be logged to the history file. 
+
+ 
+2.	After pressing Enter you will see the following screens:   
+
+
+3.	The above screens are where you select your CDF repository working copy. 
+
+
+
+
+
+ 
+The above screen is where you select your CSV containing the updates to be made. 
+ 
+The above screen is the Primary Menu of the update tool. You can see the file path to your working copy and they file path to your CSV containing the updates. 
+ 
+Update your working copy:
+In the Script press “u” and hit enter. This will check your version of the working copy and compare it to the prod svn repository. It will make the updates as needed.
+ 
+Verify files:
+Press ‘1’ and hit enter to verify the files in your update CSV exist in the working copy. You will be alerted if a file does not exist: 
+
+Locking the CDF:
+Press ‘2’ and enter to lock the files listed in the CSV. This will lock ALL files within the CSV.
+ 
+
+Updating CDFs
+Press ‘4’ to write the new lines to the cdf files, this part will take some time depending on the amount of lines and CDF files being updated. 
+ 
+Note the “error” listed here. It is not an actual error and occurs due to CSV files containing extra blank lines.
+Sorting the CDFs:
+Press ’5’ and enter to sort all CDFs that have been edited. The script opens the files and sorts based on the first column of every line.
+ 
+Note the “Commas” before and after counts. The program checks the comma values after before and after sorting to ensure no closing comas are stripped from the file, which is a common issue  when sorting CDFs in this method.
+ 
+Installing CDFs:
+Open the folder containing your working and sort by date modified with the newest modified on top. You can then group select the files you updated based on the SVN “out of sync” icon next to the file names. 
+•	Right click on the file, go to Send To then click on InstallHelper PROD / Prod – InstallHelper 
+•	The PROD – PreInstall Options window will open
+ 
+•	From the drop down list, you should only see one install location. Select that location.
+o	If you see multiple locations, check with senior member or contact OM Development EDI Requests
+•	Select Next
+•	This will opened up Beyond Compare where the original copy and the updated copy of the CDF will display for review.
+o	Review the entries you have added and make sure the changes look correct. If the updated entries looks good select X at the top right corner to close the screen.
+•	For this example, there were four entries provided.
+o	One entry was a duplicate and was not added.
+o	Two entries were updates.
+o	One entry was new.
+
+ 
+
+•	Confirm File Replace dialog will then display
+ 
+•	Confirm the File Replace by clicking Yes
+
+ 
+
+•	Installation Successful window will display. The window confirms which CDF was installed and to what location. 
+
+ 
+
+•	If a Validation Warnings window appears, STOP! Validation warnings appear when either there are not the right number of columns present on a particular line, or there is a duplicate present.
+•	It is up to us to correct these errors. If you find that there are not enough columns present in an entry, contact GAS to determine the missing value. If you find that there are duplicates, find which entries match. If the entire line is a duplicate, delete one of the entries. If only part of the entry matches, contact GAS to determine which entry is valid.
+•	Select the ‘No’ button and make all the necessary changes to clear the validation warnings.
+•	After all validation warnings have been corrected, repeat the past step of using Installhelper to install the cdf.
+•	Click Done
+
+Committing CDFs to the Repository
+Select ‘6’ and enter to Commit the changes to the SVN Repository. This will send each file updated as an individual commit and should unlock the files once completed.
+
+ 
+Note that each file commited will change the repository version by at least one.
+
+Resubmit files and resolve incident
+•	Check the incident to see if any files were requested to be re-submitted after the update. Re-submit any files if necessary and inform the requester that the CDF has been updated, the results of the possible re-submits, and resolve the incident if everything processed successfully.
+
+
+Important Notes to Remember:
+
+•	CDFs are used by translations to look up variables and determine what data should be output. These variables get matched between what the user inputs into the system and what is contained within the cdf. When the variables are matched up they need to match exactly. If the data does not match exactly, an EDE will be generated.
+•	Check to make sure that there are no spaces before or after any cdf entry. The extra spaces will cause errors.
+•	Special characters may have different hex values depending on what font was used or if they were copy and pasted. Hyphens are particularly problematic. The best way to install an entry when it contains a hyphen (-) is to delete the hyphen and retype it in or use the hex tool to compare the hex codes. A valid hex code for a hyphen is 2D.
+
+ 
+
+
+
+Congratulations, you have successfully updated and installed a CDF!
+
+
+
+ 
+Change Conflicts and Reverting Changes
+
+If you have updated a CDF and no longer wish to install/commit those changes, you will need to Revert the changes.
+It is important that you use the Revert functionality rather than using SVN Update to try and overwrite the changes you made. SVN Update will not remove any changes you made, but will instead try to merge your changes with the repository file.
+
+Revert changes by pressing “r” and enter. This will recursively revert all changes made by this script or other sources on your working copy.
+
+Occasionally, you forgot to lock a file, or forgot to update, trying to commit a CDF will result in the following error:
+  
+ 
+Press OK. The below Dialog will come up. Click Update.
+  
+
+The below is output on the Console. Click OK.
+   
+The folder will now look something like this. Ignore the extra copies that have been created. 
+ 
+  
+ 
+Right click the CDF, with the yellow exclamation mark, go to Tortoise SVN, and click Revert. 
+Any updates you made are now erased. You can then proceed with the CDF update again, starting with updating your local copy with SVN update.
+
+  
+Folder is Locked:
+
+From time to time, you will receive an error that Commit or Lock failed, and say that the folder is already locked.
+
+ 
+
+To resolve this:
+•	Go to C:\ediweb\resources\prod
+•	Right-click the client folder
+•	Scroll down to TortoiseSVN
+•	In the sub menu, click Clean up…
+ 
+
+•	In the Cleanup dialog, click OK
+o	Clean up working copy status and Include externals will already be checked
+ 
+
+•	When the cleanup is complete, click OK
+•	Return to the client folder and proceed to Commit your change
+
+ 
+
+
+The File is Locked:
+
+Contact the person who has the file locked and see if they are still updating the CDF. The message you get should tell you their username:
+
+ 
+
+“Locked by user ‘chq-justinj’ in filesystem”
+
+If the person is out of office, you will need to use your best judgement. SVN allows for stealing locks, so if the update is truly urgent, this is an option you can use. However, if the update can wait until the person is back in office, it may be better to wait, because they may have uncommitted changes.
+ 
+
+If you have stolen the locks from someone else, be sure to send them an email to let them know that they will need to revert their changes.
+
+Unlocking Files:
+
+If you take a lock and no longer need to update the CDF, or were unable to complete the update

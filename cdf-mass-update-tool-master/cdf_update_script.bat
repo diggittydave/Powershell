@@ -1,0 +1,1 @@
+powershell.exe -executionpolicy remotesigned -file "F:\EDI SUPPORT SHARED\Software\CDF Update Script\EDI_BILLING_GL_CODE_UPDATER.ps1"

@@ -1,0 +1,149 @@
+PROGRAM EIFA_CLOSE_PERIOD_001;
+
+//************************************************************************************/
+//SCRIPT: EIFA_CLOSE_PERIOD_001
+//SYSTEM: EIFA
+//DESC:          CHECKS FOR DATA ISSUES AND PERFORMS END OF MONTH CLOSE PERIOD COMMAND
+//LIMITS:
+//SCRIPT_ID:
+//AUTHOR       DATE          STATUS
+//----------------------------------
+//DAVIDWE      01/31/2019    INITIAL WRITE UP
+//DAVIDWE      02/07/2019    ADDED LOOP TO BUILD ARRAY FOR CHECKING
+//DAVIDWE      02/07/2019    SET UP PARENT SCRIPT TO RUN THIS SCRIPT.
+//DAVIDWE      02/12/2019    ADD IN TEST ARRAY READING FROM FILE
+//DAVIDWE      02/13/2019    RE-WROTE TEST ARRAY FUNCTIONALITY.
+//************************************************************************************/
+PROCEDURE Log(LogMessage : String);
+VAR
+    LogFile : TTextFile;
+    COMPANY,BRANCH, EIFA_U, BRANCH_U, M, P, PT, Y, T, TT, test, fail, close : STRING;
+    X, R, I, YI, L, TI, PG: INTEGER; 
+    DONE : BOOLEAN;
+    BRNCHARRAY : Array[0..200] of STRING;
+    TESTARRAY : Array[0..200] of STRING;
+
+BEGIN
+ //The assignfile will need to be modified for whatever machine this is put on.
+    AssignFile(LogFile, ''C:\Users\chq-davidwe\Desktop\Random_Scripts\Other_scripts\eifa_end_of_month\MONTH_END_LOG_FILE_'+HOUR+'.txt.'');       //CHANGE PATH FOR USER'S MACHINE
+    Append(LogFile);
+    WriteLn(LogFile, FormatDateTime('mm/dd/yy -- hh:mm:ss', Now()));
+    close(LogFile);
+    if FormName = 'MENU_SCREEN' then begin
+        //select Population control page
+        SetValue('SELECTION_NO','19');
+        DoAction('ENTER');
+        //get/set date and period
+      		M := Copy(GetValue('DATE_S_VAL'),0,2);
+        Y := Copy(GetValue('DATE_S_VAL'),7,4);
+        ShowMessage(M);                        //Current MONTH - WILL BE COMMENTED OUT DURING RELEASE
+        ShowMessage(Y);                       //current year   - WILL BE COMMENTED OUT DURING RELEASE 
+        I := StrToInt(M);
+        YI := StrToInt(Y)
+        CASE I OF
+            1:BEGIN
+                P:= '12';
+                Y:= IntToStr(YI-1);
+            END;
+            2: P:= '01';
+            3: P:= '02';
+            4: P:= '03';
+            5: P:= '04';
+            6: P:= '05';
+            7: P:= '06';
+            8: P:= '07';
+            9: P:= '08';
+            10: P:= '09';
+            11: P:= '10';
+            12: P:= '11';
+        END;
+        ShowMessage('MM ='+P+'  YYYY='+Y);                       - WILL BE COMMENTED OUT DURING RELEASE
+        //do initial search
+        if FormName = 'REALTIMEAUDIT' then begin
+            SetValue('COMPANY_S_VAL','EI');                     //COMPANY
+            setValue('BRANCH_S_VAL','');                        //BRANCH
+            setValue('YEAR_S_VAL',Y);                           //YEAR
+            setValue('PERIOD_S_VAL',P);                         //PERIOD
+            setValue('DATE_S_VAL','');                          //DATE
+            setValue('SELECTION','');                           //PERIOD
+            DoAction('ENTER');
+            T := COPY (GETVALUE('DATE_L'),66,4);
+            TT:= TRIM(T);
+            ShowMessage(TT);                                                 // FOR TESTING PURPOSES, WILL BE COMMENTED OUT DURING RELEASE
+            TI:= StrToInt(TT);
+            if TI > 31 THEN PG := TI / 31;                                   //SETS NUMBER OF PAGES
+            PT := IntToStr(PG);
+            ShowMessage(PT);                                                 // FOR TESTING PURPOSES, WILL BE COMMENTED OUT DURING RELEASE
+            //FIRST LOOP TO BUILD BRNCHARRAY (DUE TO FIELD NAMING CONVENTION)
+            R := 0;
+            DONE := false;
+            while NOT DONE do begin            
+                FOR X:=1 to 9 DO BEGIN
+                    EIFA_U := 'EIFA_COUNT_0'+IntToStr(X);
+                    BRANCH_U :='CFIT_COUNT_0'+IntToStr(X);
+                    if GetValue(EIFA_U)='U' THEN BEGIN
+                        BRNCHARRAY[R]:= GetValue(BRANCH_U); 
+                        R:= R + 1;
+                    END;
+                END;
+                //SECOND LOOP TO BUILD BRNCHARRAY (DUE TO FIELD NAMING CONVENTION)
+                FOR X:=10 TO 31 DO BEGIN
+                    EIFA_U := 'EIFA_COUNT_'+IntToStr(X);
+                    BRANCH_U := 'CFIT_COUNT_'+IntToStr(X);
+                    if GetValue(EIFA_U)='U' THEN BEGIN 
+                        BRNCHARRAY[R]:= GetValue(BRANCH_U);
+                        R:= R + 1;
+                    END;
+                END;
+                DoAction('PF2')
+                PG:= PG -1
+                IF PG = -1 THEN DONE := TRUE;
+            END; 
+            L :=0;
+            FOR L:=0 TO 200 DO BEGIN
+                //Change the "assignfile" based on the log file location.
+                logMessage := BRNCHARRAY[L] + ' HAS FAILED TO UPDATE WITH RESEND';
+                TESTARRAY[L] := BRNCHARRAY[L] + ' HAS FAILED TO UPDATE WITH RESEND';
+                AssignFile(LogFile, 'C:\Users\chq-davidwe\Desktop\Random_Scripts\Other_scripts\eifa_end_of_month\MONTH_END_LOG_FILE_'+HOUR+'.txt.');         //CHANGE PATH FOR USER'S MACHINE
+                Append(LogFile);
+                Writeln(LogFile,logMessage);
+                close(LogFile);
+                L := L + 1;
+            END;
+            L := 0;
+            FOR L := 0 TO 200 DO BEGIN
+                test := TESTARRAY[L]
+                fail :=pos('FAILED',test)
+                if fail >0 then begin
+                    exit;
+                end;
+            end;
+            setValue('COMMAND_LINE','CLOSE PERIOD');
+            DoAction('ENTER');
+            if MessagesContain('Press ENTER to close') THEN
+               DoAction('ENTER');
+               else
+               exit;
+            END;
+            AssignFile(LogFile, 'C:\Users\chq-davidwe\Desktop\Random_Scripts\Other_scripts\eifa_end_of_month\MONTH_END_LOG_FILE_'+HOUR+'.txt.');        //CHANGE PATH FOR USER'S MACHINE
+            append(LogFile);
+            writeln(logfile,getValue(line_01));
+            writeln(logfile,getValue(line_02));
+            writeln(logfile,getValue(line_03));
+            writeln(logfile,getValue(line_04));
+            writeln(logfile,getValue(line_05));
+            writeln(logfile,getValue(line_06));
+            writeln(logfile,getValue(line_07));
+            writeln(logfile,getValue(line_08));
+            writeln(logfile,getValue(line_09));
+            writeln(logfile,getValue(line_10));
+            writeln(logfile,getValue(line_11));
+            writeln(logfile,getValue(line_12));
+            writeln(logfile,getValue(line_13));
+            close(LogFile);
+            DoAction('PF8')
+            DoAction('PF8')
+            END;
+        END;
+    END;
+END.

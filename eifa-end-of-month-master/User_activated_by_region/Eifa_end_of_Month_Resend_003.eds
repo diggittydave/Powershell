@@ -1,0 +1,228 @@
+//32AF4CEE1B1E39BF27A962A5FFD1771E72
+//On 8/30/2019, chq-davidwe signed this file.
+PROGRAM EIFA_RESEND_003;
+
+//************************************************************************************/
+//SCRIPT: EIFA_END_OF_MONTH_001
+//SYSTEM: EIFA
+//DESC:          PERFORMS END OF MONTH POPULATION CONTROL DATA RESEND ON EACH BRANCH.
+//LIMITS:
+//SCRIPT_ID:
+//AUTHOR       DATE          STATUS
+//----------------------------------
+//DAVIDWE      01/22/2019    INITIAL WRITE UP
+//DAVIDWE      01/25/2019    ADDED IN LOGGING OF BRANCHES, FIXED ARRAY WALKING.+
+//DAVIDWE      01/31/2019    MULTI-PAGE INPUT
+//DAVIDWE      01/31/2019    REMOVED VARIABLES FOR PERIOD AND YEAR. WILL PUT BACK IN 
+//                           TESTING. P = PERIOD, Y = YEAR LINES 65 AND 66
+//DAVIDWE      01/31/2019    CHANGED LOOP
+//DAVIDWE      04/08/2019    ADDED WARNING MESSAGE FOR MAIN SCREEN. CHANGED LOGFILE TO REMAIN OPEN UNTIL END
+//DAVIDWE      04/23/2019    REFORMATTED FOR PROCEDURES AND CREATED CHECK TO RUN RESEND OR CLOSE PERIOD
+//DAVIDWE      05/01/2018    RE-WROTE CASE STATEMENT.
+//DAVIDWE      07/17/2019    RE-WRITING ARRAY FUNCTION TO HANDLE MULTIPLE "COMPANIES" PER EIFA SITE.(ARRAY OF ARRAY)
+//DAVIDWE      07/19/2019    BROKE OUT LOGGING FUNCTION TO ITS OWN PROCEDURE. COMPLETED TESTING.
+//************************************************************************************/
+
+VAR
+    //set variables
+    LogFile : TTextFile;      //LOGFILE VARIABLE
+    CompanyFile : TTextFile;  //COMPANY LIST VARIABLE
+    COMPANY : STRING;         // COMPANY CODE VARIABLE
+    BRANCH : STRING;          // BRANCH CODE VARIABLE
+    EIFA_U : STRING;          // CHECKS TO SEE IF UNBALANCED FLAG EXISITS
+    BRANCH_U : STRING;        // BRANCH CODE FROM POPCTRL LIST IF EIFA_U VALUE IS 'U'
+    M : STRING;               // MONTH VALUE. Set in the setPeriod procedure. 
+    P : STRING;               // PERIOD VALUE. Set in the setPeriod procedure. 
+    PT : STRING;              // EXISTED DURING TESTING. WOULD SHOW THE PERIOD VALUE IN MESSAGE
+    Y : STRING;               // YEAR VALUE . Set in the setPeriod procedure. 
+    T : STRING;               // Used in calculating number of pages of unbalanced branches.
+    TT : STRING;              // Used in calculating number of pages of unbalanced branches.
+    LogMessage : STRING;      // used to log errors and branches/companies into log file.
+    logPath : STRING;         // used to set the full path name of the log file. 
+    companyPath : STRING;     // used to set the full path name of the Company list file. 
+    companyLine : STRING;     // Used in reading the lines of the company list file.
+    X : INTEGER;              // Counting integer, used in multiple procedures. Reset inside each.
+    Z : INTEGER;              // Counting integer, used in BuildResendList to increment through company numbers
+    R : INTEGER;              // Counting integer. Used inside the BuildResendList
+    I : INTEGER;              // used in calculating the period.
+    YI : INTEGER;             // used in calculating the period if the month is january.
+    L : INTEGER;              // Counting Integer, used in conjuction with the branch array to log to file.
+    TI : INTEGER;             // Used in calculating the number of pages needed to scroll through to read unbalanced branches.
+    PG: INTEGER;              // counting integer, = the page number/number of pages.
+    DONE : Boolean;           // boolean used to end loops when they finish.
+    DONE1 : BOOLEAN;          // boolean used to end loops when they finish.
+    DONE2 : BOOLEAN;          // boolean used to end loops when they finish.
+    DONE3 : BOOLEAN;          // boolean used to end loops when they finish.
+    BRNCHARRAY : Array[0..700] of array[0..2]  of STRING; // array of branch codes to resend. Built in the BuildResendList
+    companyArray : Array[0..200] of STRING; // array of company codes
+   
+    
+PROCEDURE setPeriod;
+BEGIN
+    if FormName = 'MENU_SCREEN' then begin
+        //select Population control page
+        SetValue('SELECTION_NO','19');
+        DoAction('ENTER');
+        //get/set date and period
+      	 M := Copy(GetValue('DATE_S_VAL'),0,2);
+        Y := Copy(GetValue('DATE_S_VAL'),7,4);
+        I := StrToInt(M);
+        YI := StrToInt(Y);
+        CASE I OF
+            1:BEGIN
+                P:= '12'; 
+                Y:= IntToStr(YI-1);
+            END;
+            2: P:= '01';
+            3: P:= '02';
+            4: P:= '03';
+            5: P:= '04';
+            6: P:= '05';
+            7: P:= '06';
+            8: P:= '07';
+            9: P:= '08';
+            10: P:= '09';
+            11: P:= '10';
+            12: P:= '11';
+        END;
+        //ShowMessage('MM ='+P+'  YYYY='+Y);                       // FOR TESTING PURPOSES, WILL BE COMMENTED OUT DURING RELEASE
+        //do initial search
+    End;
+end;
+
+PROCEDURE BuildCompanyList;
+BEGIN
+    Reset(companyfile);
+    x := 0;
+    DONE3 := FALSE
+    while not DONE3 do begin
+            companyLine := readln(companyfile);
+            IF length(companyLine) > 0 THEN BEGIN
+                companyArray[x] := companyLine;
+            END
+            ELSE BEGIN
+                DONE3 := TRUE ;
+            end;
+			 x := x + 1;
+    end;
+end;
+
+PROCEDURE BuildResendList;
+BEGIN
+    if FormName = 'REALTIMEAUDIT' then begin // begins resend list.
+        DONE1 := false;
+        while NOT DONE1 DO BEGIN
+            for Z:=0 to 200 DO BEGIN
+                COMPANY := companyArray[Z]
+                if Length(COMPANY) > 0 THEN BEGIN
+                    SetValue('COMPANY_S_VAL',COMPANY);                  //COMPANY
+                    setValue('BRANCH_S_VAL','');                        //BRANCH
+                    setValue('YEAR_S_VAL',Y);                           //YEAR     ------SET TO 2017 FOR TESTING PURPOSES--- SET IT BACK TO 'Y' FOR LIVE DATA
+                    setValue('PERIOD_S_VAL',P);                         //PERIOD   ------SET TO 09 FOR TESTING PURPOSES--- SET IT BACK TO 'P' FOR LIVE DATA
+                    setValue('DATE_S_VAL','');                          //DATE
+                    setValue('SELECTION','Y');                          //UNBALANCED FLAG
+                    DoAction('ENTER');
+                    If MessagesContain('Input selection') THEN BEGIN
+                        T := COPY (GETVALUE('DATE_L'),66,4);
+                        TT:= TRIM(T);
+                        TI:= StrToInt(TT);
+			                  			PG := 0;
+                        if TI > 31 THEN BEGIN
+						                     PG := TI / 31;                                  //SETS NUMBER OF PAGES
+						                  END;
+                        R := 0;
+                        DONE2 := false;
+                        while NOT DONE2 do begin            
+                            FOR X:=1 to 9 DO BEGIN
+                                EIFA_U := 'EIFA_COUNT_0'+IntToStr(X);
+                                BRANCH_U :='CFIT_COUNT_0'+IntToStr(X);
+                                if GetValue(EIFA_U)='U' THEN BEGIN
+                                    BRNCHARRAY[R][0]:= COMPANY
+                                    BRNCHARRAY[R][1]:= GetValue(BRANCH_U); 
+                                    R := R + 1;
+                                END;
+                            END;
+                           //SECOND LOOP TO BUILD BRNCHARRAY (DUE TO FIELD NAMING CONVENTION)
+                            FOR X:=10 TO 31 DO BEGIN
+                                EIFA_U := 'EIFA_COUNT_'+IntToStr(X);
+                                BRANCH_U := 'CFIT_COUNT_'+IntToStr(X);
+                                if GetValue(EIFA_U)='U' THEN BEGIN 
+                                    BRNCHARRAY[R][0]:= COMPANY;
+                                    BRNCHARRAY[R][1]:= GetValue(BRANCH_U); 
+                                    R:= R + 1;
+                                END;
+                            END;
+                            DoAction('PF2')
+                            PG := PG -1
+                            IF PG = -1 THEN BEGIN
+                                 DONE2 := TRUE;
+	                     						END
+                        END;
+                    END;
+				            END
+                ELSE BEGIN
+                    DONE1 := TRUE;
+                END;
+            END;
+        end;
+    end;
+END;
+
+
+Procedure WriteToLog;
+BEGIN
+    L :=0
+    WHILE NOT DONE DO BEGIN
+        logMessage := BRNCHARRAY[L][0]+','+BRNCHARRAY[L][1];
+		      L := l + 1;
+        IF (L < 700) and (length(logMessage) > 2) THEN BEGIN
+            Append(LogFile);
+            Writeln(LogFile,logMessage);
+        END
+        ELSE BEGIN
+			         DONE := TRUE;
+        end;
+    END;
+END;
+ 
+PROCEDURE ResendData;    
+BEGIN
+    X := 0;
+    While Length(BRNCHARRAY[X][1]) > 0 DO BEGIN
+        COMPANY := BRNCHARRAY[X][0]           //SETS COMPANY TO THE COMPANY CODE VALUE FOUND IN X ROW COLLUMN 1 OF THE ARRAY
+        BRANCH_U := BRNCHARRAY[X][1];          //SETS BRANCH_U TO THE BRANCH CODE VALUE FOUND IN X ROW COLLUMN 2 OF THE ARRAY
+        SetValue('COMPANY_S_VAL',COMPANY);     //COMPANY
+        setValue('BRANCH_S_VAL',BRANCH_U);     //BRANCH
+        setValue('YEAR_S_VAL',Y);              //YEAR
+        setValue('PERIOD_S_VAL',P);            //PERIOD
+        setValue('DATE_S_VAL','');             //DATE
+        setValue('SELECTION','');              //PERIOD
+        DoAction('ENTER');                     //LOADS BRANCH DISCREPENCY DATA
+        DoAction('PF4');                       //RESENDS DATE
+        X := X + 1;
+    END;
+    DoAction('PF8')
+ END;      
+
+
+// checks current server time and runs the correct procedure. 
+BEGIN
+//The assignfile will need to be modified for whatever machine this is put on.
+    companyPath := 'F:\IMPORT SUPPORT SHARED\David\Eifa_End_of_Month\User_activated_by_region\Eifa_Companies.txt'
+    assignfile(CompanyFile, companyPath);
+    logPath := 'F:\IMPORT SUPPORT SHARED\David\Eifa_End_of_Month\User_activated_by_region\logs\MONTH_END_LOG_FILE.txt'
+    AssignFile(LogFile, logPath);    
+    Append(LogFile);
+    WriteLn(LogFile, FormatDateTime('mm/dd/yy -- hh:mm:ss', Now()));
+    if FormName <> 'MENU_SCREEN' then
+        begin
+            ShowMessage('The script should be started from the Log screen.' +
+             'If the problem persists, contact the script author.')
+             EXIT;
+        end;
+    setPeriod;
+    BuildCompanyList;
+    BuildResendList;
+	   WriteToLog;
+    ResendData;
+end.
